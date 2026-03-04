@@ -69,7 +69,7 @@
       "Write unit test in tests/unit/test_tools_localidades.py: mock IBGEClient.get to return fixture data, assert get_states returns list with sigla field."
     ],
     "depends_on": ["F03"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F06",
