@@ -94,7 +94,7 @@
       "Write test in tests/unit/test_tools_agregados.py: mock IBGEClient.get, assert get_population returns correct structure."
     ],
     "depends_on": ["F03"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F08",
