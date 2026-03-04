@@ -205,7 +205,7 @@
       "Register router in src/main.py: app.include_router(history_router)."
     ],
     "depends_on": ["F02"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F16",
