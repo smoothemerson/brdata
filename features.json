@@ -27,7 +27,7 @@
       "In src/main.py lifespan: call async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all) to initialize tables on startup."
     ],
     "depends_on": ["F04"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F03",
