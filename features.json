@@ -221,7 +221,7 @@
       "Write integration test in tests/integration/test_health.py: use FastAPI TestClient, mock all four HTTP checks, test all-healthy case and one-service-down case."
     ],
     "depends_on": ["F02"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F17",
