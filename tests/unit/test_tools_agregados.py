@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mcp_server.tools.agregados import get_population
+from mcp_server.tools.agregados import get_population, search_aggregates
 
 
 POPULATION_FIXTURE = [
@@ -57,3 +57,34 @@ async def test_get_population_passes_correct_params(mock_client):
 
     _, kwargs = mock_client.get.call_args
     assert kwargs["params"]["localidades"] == "N3[all]"
+
+
+AGGREGATES_FIXTURE = [
+    {"id": str(i), "nome": f"Table {i}", "pesquisa": "censo"} for i in range(25)
+]
+
+
+async def test_search_aggregates_passes_keyword_as_query_param(mock_client):
+    mock_client.get.return_value = AGGREGATES_FIXTURE
+
+    await search_aggregates("censo", mock_client)
+
+    mock_client.get.assert_called_once_with(
+        "/v3/agregados", params={"pesquisa": "censo"}
+    )
+
+
+async def test_search_aggregates_truncates_to_20_results(mock_client):
+    mock_client.get.return_value = AGGREGATES_FIXTURE
+
+    result = await search_aggregates("censo", mock_client)
+
+    assert len(result) == 20
+
+
+async def test_search_aggregates_returns_fewer_than_20_when_small_response(mock_client):
+    mock_client.get.return_value = AGGREGATES_FIXTURE[:5]
+
+    result = await search_aggregates("pib", mock_client)
+
+    assert len(result) == 5

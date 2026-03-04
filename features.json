@@ -106,7 +106,7 @@
       "Write test in tests/unit/test_tools_agregados.py: assert search_aggregates passes keyword as query param, returns truncated list."
     ],
     "depends_on": ["F03"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F09",
