@@ -146,7 +146,7 @@
       "In graph.py: define async def build_graph() -> CompiledStateGraph. Load MCP tools via load_mcp_tools(), create ChatOllama(model, base_url), bind tools to LLM. Build StateGraph(AgentState): add agent node (partial with llm_with_tools), add tools node (ToolNode wrapped with tracking), set entry START → agent, add conditional edge agent → should_continue → (tools | END), add edge tools → agent, compile and return. Define async def get_graph() with module-level caching."
     ],
     "depends_on": ["F04", "F02"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F12",
