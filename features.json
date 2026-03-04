@@ -131,7 +131,7 @@
       "Write test in tests/unit/test_tools_nomes.py: assert get_name_frequency('jose', ...) calls path with uppercased name /v2/censos/nomes/JOSE, assert lowercase input also works."
     ],
     "depends_on": ["F03"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F11",
