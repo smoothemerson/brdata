@@ -81,7 +81,7 @@
       "Write test in tests/unit/test_tools_localidades.py: mock IBGEClient.get, assert get_municipalities('sp', ...) calls the correct path with uppercase UF, returns municipality dicts."
     ],
     "depends_on": ["F05"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F07",
