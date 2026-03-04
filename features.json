@@ -237,6 +237,6 @@
       "Ensure pyproject.toml has [tool.pytest.ini_options] with asyncio_mode = 'auto' and testpaths = ['tests']."
     ],
     "depends_on": ["F14", "F15", "F16"],
-    "passes": false
+    "passes": true
   }
 ]
