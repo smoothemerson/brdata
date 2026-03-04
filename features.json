@@ -161,7 +161,7 @@
       "Raise RuntimeError('MCP server unavailable: {detail}') if the connection fails, so the lifespan startup fails fast with a clear message."
     ],
     "depends_on": ["F11", "F05", "F06", "F07", "F08", "F09", "F10"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F13",
