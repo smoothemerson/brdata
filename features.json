@@ -175,7 +175,7 @@
       "Ensure tool_node_with_tracking in nodes.py extracts tool call records from ToolMessage objects after each tool execution and accumulates them in state['tools_called'] as dicts with keys: tool_name, params (from AIMessage.tool_calls), result (from ToolMessage.content parsed as JSON if possible), error (None on success)."
     ],
     "depends_on": ["F12"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F14",
