@@ -191,7 +191,7 @@
       "In src/main.py lifespan: call await load_mcp_tools() and await get_graph() at startup to warm up connections before serving traffic."
     ],
     "depends_on": ["F13", "F02"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F15",
