@@ -55,7 +55,7 @@
       "Create src/main.py: minimal FastAPI app with asynccontextmanager lifespan (stub for now), include a GET / route returning {\"status\": \"ok\"}, set app = FastAPI(lifespan=lifespan)."
     ],
     "depends_on": [],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F05",
