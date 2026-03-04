@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from mcp_server.tools.agregados import get_population, search_aggregates
+from mcp_server.tools.agregados import (
+    get_aggregate_data,
+    get_population,
+    search_aggregates,
+)
 
 
 POPULATION_FIXTURE = [
@@ -88,3 +92,34 @@ async def test_search_aggregates_returns_fewer_than_20_when_small_response(mock_
     result = await search_aggregates("pib", mock_client)
 
     assert len(result) == 5
+
+
+AGGREGATE_DATA_FIXTURE = [
+    {
+        "id": 9514,
+        "variavel": "Rendimento médio",
+        "unidade": "Reais",
+        "resultados": [],
+    }
+]
+
+
+async def test_get_aggregate_data_constructs_correct_url(mock_client):
+    mock_client.get.return_value = AGGREGATE_DATA_FIXTURE
+
+    result = await get_aggregate_data(9514, "2022", 1, mock_client)
+
+    mock_client.get.assert_called_once_with(
+        "/v3/agregados/9514/periodos/2022/variaveis/1"
+    )
+    assert result == AGGREGATE_DATA_FIXTURE
+
+
+async def test_get_aggregate_data_uses_latest_period(mock_client):
+    mock_client.get.return_value = AGGREGATE_DATA_FIXTURE
+
+    await get_aggregate_data(1705, "-1", 614, mock_client)
+
+    mock_client.get.assert_called_once_with(
+        "/v3/agregados/1705/periodos/-1/variaveis/614"
+    )

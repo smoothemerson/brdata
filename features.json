@@ -118,7 +118,7 @@
       "Write test in tests/unit/test_tools_agregados.py: assert correct URL path is constructed from parameters."
     ],
     "depends_on": ["F08"],
-    "passes": false
+    "passes": true
   },
   {
     "id": "F10",
