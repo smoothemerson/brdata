@@ -91,13 +91,13 @@ services:
       IBGE_BASE_URL: ${IBGE_BASE_URL:-https://servicodados.ibge.gov.br/api}
     depends_on:
       ollama-pull-llama-cpu:
-        condition: service_started
+        condition: service_completed_successfully
         required: false
       ollama-pull-llama-gpu-amd:
-        condition: service_started
+        condition: service_completed_successfully
         required: false
       ollama-pull-llama-gpu-nvidia:
-        condition: service_started
+        condition: service_completed_successfully
         required: false
     restart: on-failure
 
