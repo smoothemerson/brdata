@@ -3,42 +3,27 @@
     "id": "F01",
     "title": "Docker Compose Skeleton",
     "category": "infrastructure",
-    "description": "Create the root docker-compose.yml defining all four services (api, mcp, postgres, ollama) with port mappings, named volumes, a shared network, health checks, and dependency ordering. Create .env.example with all required environment variables. Create .gitignore and .dockerignore.",
+    "description": "docker-compose.yml with three services (api, mcp, ollama) using GPU profiles (cpu/gpu-amd/gpu-nvidia) via YAML anchors. Includes ollama-pull-llama init containers, network alias for ollama, and service_completed_successfully dependency. .env.example with COMPOSE_PROFILES, OLLAMA_MODEL, OLLAMA_BASE_URL, MCP_BASE_URL, IBGE_BASE_URL.",
     "steps": [
-      "Create docker-compose.yml with services: postgres (image postgres:16, volume pgdata, healthcheck pg_isready), ollama (image ollama/ollama:latest, volume ollama_data, port 11434, healthcheck GET /api/tags validates llama3.2 is present), mcp (build ./mcp_server, port 8001, healthcheck GET /health), api (build . root Dockerfile, port 8000, depends_on postgres+mcp+ollama with condition service_healthy).",
-      "Define named volumes: pgdata, ollama_data.",
-      "Create .env.example with: OLLAMA_MODEL=llama3.2, OLLAMA_BASE_URL=http://ollama:11434, POSTGRES_URL=postgresql+asyncpg://ibge:ibge@postgres:5432/ibge, POSTGRES_USER=ibge, POSTGRES_PASSWORD=ibge, POSTGRES_DB=ibge, MCP_BASE_URL=http://mcp:8001, IBGE_BASE_URL=https://servicodados.ibge.gov.br/api.",
-      "Create .gitignore excluding .env, __pycache__, *.pyc, .venv, dist, *.egg-info.",
-      "Create .dockerignore excluding .env, __pycache__, *.pyc, .git, tests/, .github/."
+      "Define x-ollama anchor: image ollama/ollama:latest, container_name ollama, port 11434, volume ollama_data, network alias ollama.",
+      "Define x-init-ollama anchor: runs ollama pull $OLLAMA_MODEL after a 3s sleep, OLLAMA_HOST=ollama:11434.",
+      "Create profile services: ollama-cpu, ollama-gpu-amd (rocm image + /dev/kfd /dev/dri), ollama-gpu-nvidia (nvidia deploy resources).",
+      "Create matching ollama-pull-llama-{cpu,gpu-amd,gpu-nvidia} init services, each depends_on its ollama variant.",
+      "api service: depends_on all three pull containers with condition service_completed_successfully, required false; restart on-failure.",
+      "mcp service: healthcheck curl -sf http://localhost:8001/health.",
+      "Create .env.example and .gitignore (.env, __pycache__, .venv)."
     ],
     "depends_on": [],
-    "passes": true
-  },
-  {
-    "id": "F02",
-    "title": "PostgreSQL Schema Initialization",
-    "category": "infrastructure",
-    "description": "Create the SQL DDL migration file and wire it into the API startup so tables are created automatically when the service starts. Uses SQLAlchemy async ORM with asyncpg driver.",
-    "steps": [
-      "Create src/db/__init__.py (empty).",
-      "Create src/db/models.py: define Base = DeclarativeBase(). Define QueryModel (__tablename__='queries') with columns: id (UUID PK, server_default gen_random_uuid()), session_id (UUID nullable), question (Text not null), answer (Text nullable), tools_used (JSONB nullable), latency_ms (Integer nullable), created_at (DateTime with timezone, server_default now()). Define ToolCallModel (__tablename__='tool_calls') with: id (UUID PK), query_id (UUID FK → queries.id, ON DELETE CASCADE), tool_name (Text not null), params (JSONB default {}), result (JSONB nullable), error (Text nullable), called_at (DateTime with timezone, server_default now()).",
-      "Create src/db/connection.py: use create_async_engine with POSTGRES_URL from config, define async_session_maker = async_sessionmaker(engine, expire_on_commit=False), export async def get_db() as an async generator yielding AsyncSession for FastAPI Depends.",
-      "Create src/config.py using pydantic-settings BaseSettings reading all env vars: ollama_model, ollama_base_url, postgres_url, mcp_base_url, ibge_base_url.",
-      "In src/main.py lifespan: call async with engine.begin() as conn: await conn.run_sync(Base.metadata.create_all) to initialize tables on startup."
-    ],
-    "depends_on": ["F04"],
     "passes": true
   },
   {
     "id": "F03",
     "title": "MCP Service Dockerfile and Requirements",
     "category": "infrastructure",
-    "description": "Create the Dockerfile and pyproject.toml (or requirements.txt) for the mcp_server service. The MCP service runs FastMCP on port 8001.",
+    "description": "Dockerfile for the mcp_server service. Runs FastMCP on port 8001 via streamable-http transport.",
     "steps": [
-      "Create mcp_server/Dockerfile: use python:3.13-slim base, set WORKDIR /app, copy pyproject.toml, run pip install with mcp dependencies (fastmcp, httpx), copy mcp_server/ directory, expose port 8001, set CMD to run the server: python -m mcp_server.server.",
-      "Ensure pyproject.toml (at project root, shared) includes mcp_server dependencies: fastmcp>=2.0, httpx>=0.27.",
-      "Create mcp_server/__init__.py (empty).",
-      "Create mcp_server/tools/__init__.py (empty)."
+      "mcp_server/Dockerfile: python:3.14-slim base, WORKDIR /app, copy requirements.txt, pip install, copy mcp_server/, expose 8001, CMD uvicorn.",
+      "Create mcp_server/__init__.py and mcp_server/tools/__init__.py."
     ],
     "depends_on": [],
     "passes": true
@@ -47,196 +32,127 @@
     "id": "F04",
     "title": "API Service Dockerfile and Requirements",
     "category": "infrastructure",
-    "description": "Create the root Dockerfile for the api service and the pyproject.toml with all Python dependencies for both services. Also create the minimal FastAPI app stub.",
+    "description": "Root Dockerfile for the api service. Minimal FastAPI app with lifespan.",
     "steps": [
-      "Create pyproject.toml with [project] name=ibge-agent, python>=3.13. Dependencies: fastapi>=0.115, uvicorn[standard]>=0.32, langchain>=0.3, langgraph>=0.2, langchain-ollama>=0.2, langchain-mcp-adapters>=0.1, sqlalchemy[asyncio]>=2.0, asyncpg>=0.30, pydantic-settings>=2.0, httpx>=0.27, fastmcp>=2.0. Dev dependencies: pytest>=8, pytest-asyncio>=0.24, ruff>=0.8.",
-      "Create root Dockerfile: python:3.13-slim base, WORKDIR /app, copy pyproject.toml, run pip install -e ., copy src/, expose 8000, CMD [\"uvicorn\", \"src.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\"].",
-      "Create src/__init__.py (empty).",
-      "Create src/main.py: minimal FastAPI app with asynccontextmanager lifespan (stub for now), include a GET / route returning {\"status\": \"ok\"}, set app = FastAPI(lifespan=lifespan)."
+      "Root Dockerfile: python:3.14-slim base, WORKDIR /app, copy requirements.txt, pip install, copy src/, expose 8000, CMD uvicorn src.main:app.",
+      "requirements.txt and pyproject.toml with all pinned dependencies including ruff under [dependency-groups] dev.",
+      "src/main.py: FastAPI app with asynccontextmanager lifespan, includes chat and health routers.",
+      "src/env.py: reads OLLAMA_MODEL, OLLAMA_BASE_URL, MCP_BASE_URL, IBGE_BASE_URL from environment."
     ],
     "depends_on": [],
     "passes": true
   },
   {
     "id": "F05",
-    "title": "MCP Tool: get_states",
+    "title": "MCP Tool: ibge_get_states",
     "category": "mcp",
-    "description": "Implement the get_states MCP tool that returns all Brazilian states from the IBGE localidades API. Also create the shared IBGEClient httpx wrapper used by all tools.",
+    "description": "get_states tool returning all Brazilian states from IBGE /v1/localidades/estados. Registered in FastMCP server.",
     "steps": [
-      "Create mcp_server/ibge_client.py: define class IBGEClient with __init__(self, base_url: str) creating an httpx.AsyncClient with 30s timeout. Implement async def get(self, path: str, params: dict | None = None) -> dict | list performing GET requests and returning parsed JSON. Implement async def close(self). Export get_ibge_client() factory.",
-      "Create mcp_server/tools/localidades.py.",
-      "Implement async def get_states(ibge_client: IBGEClient) -> list[dict]: calls ibge_client.get('/v1/localidades/estados'), returns the list of state objects (each has id, sigla, nome, regiao). Add docstring: 'Returns all 27 Brazilian states with their region information.'",
-      "Write unit test in tests/unit/test_tools_localidades.py: mock IBGEClient.get to return fixture data, assert get_states returns list with sigla field."
+      "mcp_server/ibge_client.py: IBGEClient with httpx.AsyncClient, async get(path, params) method.",
+      "mcp_server/tools/location.py: async def get_states(ibge_client) calling /v1/localidades/estados.",
+      "mcp_server/server.py: FastMCP app with streamable-http transport on port 8001, registers ibge_get_states tool."
     ],
     "depends_on": ["F03"],
     "passes": true
   },
   {
     "id": "F06",
-    "title": "MCP Tool: get_municipalities",
+    "title": "MCP Tool: ibge_get_municipalities",
     "category": "mcp",
-    "description": "Implement the get_municipalities MCP tool that returns all municipalities for a given Brazilian state (UF code).",
+    "description": "get_municipalities tool returning all municipalities for a given UF code from IBGE.",
     "steps": [
-      "In mcp_server/tools/localidades.py, add async def get_municipalities(uf: str, ibge_client: IBGEClient) -> list[dict]: uppercases uf, calls ibge_client.get(f'/v1/localidades/estados/{uf}/municipios'), returns municipality list. Add docstring: 'Returns all municipalities for a Brazilian state. uf must be a 2-letter state code (e.g. SP, RJ, MG).'",
-      "Write test in tests/unit/test_tools_localidades.py: mock IBGEClient.get, assert get_municipalities('sp', ...) calls the correct path with uppercase UF, returns municipality dicts."
+      "mcp_server/tools/location.py: async def get_municipalities(uf, ibge_client) uppercasing uf and calling /v1/localidades/estados/{uf}/municipios.",
+      "Register ibge_get_municipalities in mcp_server/server.py."
     ],
     "depends_on": ["F05"],
     "passes": true
   },
   {
-    "id": "F07",
-    "title": "MCP Tool: get_population",
-    "category": "mcp",
-    "description": "Implement the get_population MCP tool that returns Brazil's population by state from the most recent IBGE census via the agregados API.",
-    "steps": [
-      "Create mcp_server/tools/agregados.py.",
-      "Implement async def get_population(ibge_client: IBGEClient) -> list[dict]: calls ibge_client.get('/v3/agregados/1705/periodos/-1/variaveis/614', params={'localidades': 'N3[all]'}), returns raw JSON. Add docstring: 'Returns Brazilian population data by state from the most recent IBGE census (aggregate 1705, variable 614).'",
-      "Write test in tests/unit/test_tools_agregados.py: mock IBGEClient.get, assert get_population returns correct structure."
-    ],
-    "depends_on": ["F03"],
-    "passes": true
-  },
-  {
-    "id": "F08",
-    "title": "MCP Tool: search_aggregates",
-    "category": "mcp",
-    "description": "Implement the search_aggregates MCP tool that searches IBGE aggregate tables by keyword.",
-    "steps": [
-      "In mcp_server/tools/agregados.py, add async def search_aggregates(keyword: str, ibge_client: IBGEClient) -> list[dict]: calls ibge_client.get('/v3/agregados', params={'pesquisa': keyword}), returns list of matching aggregate tables. Truncate to first 20 results to avoid overwhelming the LLM context. Add docstring: 'Searches IBGE aggregate tables by keyword in Portuguese (e.g. censo, pib, educacao). Returns matching table metadata including id, nome, and pesquisa fields.'",
-      "Write test in tests/unit/test_tools_agregados.py: assert search_aggregates passes keyword as query param, returns truncated list."
-    ],
-    "depends_on": ["F03"],
-    "passes": true
-  },
-  {
-    "id": "F09",
-    "title": "MCP Tool: get_aggregate_data",
-    "category": "mcp",
-    "description": "Implement the get_aggregate_data MCP tool that fetches data from a specific IBGE aggregate table by ID, period, and variable.",
-    "steps": [
-      "In mcp_server/tools/agregados.py, add async def get_aggregate_data(aggregate_id: int, period: str, variable: int, ibge_client: IBGEClient) -> list[dict]: calls ibge_client.get(f'/v3/agregados/{aggregate_id}/periodos/{period}/variaveis/{variable}'), returns raw JSON. Add docstring: 'Fetches data from a specific IBGE aggregate table. aggregate_id: numeric table ID from search_aggregates. period: IBGE period syntax like 2022 or -1 (latest). variable: numeric variable ID.'",
-      "Write test in tests/unit/test_tools_agregados.py: assert correct URL path is constructed from parameters."
-    ],
-    "depends_on": ["F08"],
-    "passes": true
-  },
-  {
-    "id": "F10",
-    "title": "MCP Tool: get_name_frequency",
-    "category": "mcp",
-    "description": "Implement the get_name_frequency MCP tool that queries name frequency across Brazilian census decades.",
-    "steps": [
-      "Create mcp_server/tools/nomes.py.",
-      "Implement async def get_name_frequency(name: str, ibge_client: IBGEClient) -> list[dict]: uppercases name, calls ibge_client.get(f'/v2/censos/nomes/{name.upper()}'), returns frequency distribution list. Add docstring: 'Returns frequency distribution of a Brazilian first name across census decades. name: a single first name in Portuguese (e.g. JOSE, MARIA, ANA). Case-insensitive.'",
-      "Write test in tests/unit/test_tools_nomes.py: assert get_name_frequency('jose', ...) calls path with uppercased name /v2/censos/nomes/JOSE, assert lowercase input also works."
-    ],
-    "depends_on": ["F03"],
-    "passes": true
-  },
-  {
     "id": "F11",
-    "title": "LangGraph Agent State and Graph Definition",
+    "title": "LangChain Agent",
     "category": "agent",
-    "description": "Define the LangGraph AgentState TypedDict, system prompt, and assemble the full ReAct StateGraph (START → assistant → tools_condition → tools → assistant loop). Includes the MCP client bootstrap.",
+    "description": "LangGraph agent built with create_agent(), using ChatOllama and MCP tools. No custom state or tool tracking.",
     "steps": [
-      "Create src/agent/__init__.py, src/agent/state.py, src/agent/prompts.py, src/agent/nodes.py, src/agent/graph.py.",
-      "In state.py: define AgentState(TypedDict) with fields: messages: Annotated[list[BaseMessage], add_messages], tools_called: list[dict], question: str, session_id: str | None.",
-      "In prompts.py: write SYSTEM_PROMPT instructing the agent to answer questions about Brazil using IBGE tools, cite data sources, respond in the same language as the question, never fabricate statistics.",
-      "In nodes.py: define async def agent_node(state, llm_with_tools) that prepends system prompt on first call and invokes the LLM. Define async def tool_node_with_tracking(state, tool_node) that calls ToolNode and extracts tool call records (name, args, result) into tools_called. Define def should_continue(state) returning 'tools' if last message has tool_calls else '__end__'.",
-      "In graph.py: define async def build_graph() -> CompiledStateGraph. Load MCP tools via load_mcp_tools(), create ChatOllama(model, base_url), bind tools to LLM. Build StateGraph(AgentState): add agent node (partial with llm_with_tools), add tools node (ToolNode wrapped with tracking), set entry START → agent, add conditional edge agent → should_continue → (tools | END), add edge tools → agent, compile and return. Define async def get_graph() with module-level caching."
+      "src/agent/prompt.py: SYSTEM_PROMPT instructing the agent to answer questions about Brazil using IBGE tools, respond in the same language as the question, never fabricate statistics.",
+      "src/agent/agent.py: async def agent_call(question) — instantiates ChatOllama(model, base_url), calls load_mcp_tools(), builds agent via create_agent(llm, tools), invokes with system + user messages, returns last message content."
     ],
-    "depends_on": ["F04", "F02"],
+    "depends_on": ["F04", "F12"],
     "passes": true
   },
   {
     "id": "F12",
-    "title": "MCP Client Bootstrap in Agent",
+    "title": "MCP Client Bootstrap",
     "category": "agent",
-    "description": "Implement src/mcp/client.py using langchain-mcp-adapters to connect to the FastMCP server and return LangChain BaseTool instances ready for LangGraph's ToolNode.",
+    "description": "src/mcp/client.py using langchain-mcp-adapters MultiServerMCPClient to load tools from the MCP server.",
     "steps": [
-      "Create src/mcp/__init__.py and src/mcp/client.py.",
-      "Import MultiServerMCPClient from langchain_mcp_adapters.client.",
-      "Define async def load_mcp_tools() -> list[BaseTool]: create MultiServerMCPClient configured with MCP_BASE_URL from config using streamable-http transport at /mcp path, call await client.get_tools(), return tool list.",
-      "Add module-level caching: _tools_cache: list | None = None and asyncio.Lock() to ensure load_mcp_tools() only connects once across concurrent calls.",
-      "Raise RuntimeError('MCP server unavailable: {detail}') if the connection fails, so the lifespan startup fails fast with a clear message."
+      "async def load_mcp_tools() -> list[BaseTool]: creates MultiServerMCPClient with MCP_BASE_URL and streamable-http transport, calls get_tools(), returns tool list."
     ],
-    "depends_on": ["F11", "F05", "F06", "F07", "F08", "F09", "F10"],
-    "passes": true
-  },
-  {
-    "id": "F13",
-    "title": "Tool Call Interception and Persistence",
-    "category": "agent",
-    "description": "Implement src/db/repository.py with save_query() and get_history() functions that persist agent interactions to PostgreSQL.",
-    "steps": [
-      "Create src/db/repository.py.",
-      "Implement async def save_query(db: AsyncSession, *, question: str, session_id: UUID | None, answer: str, tools_used: list[dict], latency_ms: int) -> QueryModel: insert QueryModel row, flush to get the generated id, bulk-insert ToolCallModel rows mapping tools_used list (each dict has tool_name, params, result, error) with query_id FK, commit, return the saved QueryModel.",
-      "Implement async def get_history(db: AsyncSession, *, session_id: UUID | None = None, limit: int = 20) -> list[QueryModel]: select from QueryModel ordered by created_at DESC, filter by session_id if provided, limit results.",
-      "Ensure tool_node_with_tracking in nodes.py extracts tool call records from ToolMessage objects after each tool execution and accumulates them in state['tools_called'] as dicts with keys: tool_name, params (from AIMessage.tool_calls), result (from ToolMessage.content parsed as JSON if possible), error (None on success)."
-    ],
-    "depends_on": ["F12"],
+    "depends_on": ["F05", "F06"],
     "passes": true
   },
   {
     "id": "F14",
     "title": "POST /chat Endpoint",
     "category": "api",
-    "description": "Implement the POST /chat route that accepts a question, invokes the LangGraph agent, persists the result, and returns the answer with tool usage metadata.",
+    "description": "POST /chat accepts a question string and returns the agent's answer.",
     "steps": [
-      "Create src/api/__init__.py, src/api/routes/__init__.py, src/api/schemas.py.",
-      "In schemas.py: define ChatRequest(BaseModel) with question: str, session_id: str | None = None. Define ChatResponse(BaseModel) with answer: str, tools_used: list[dict], latency_ms: int, query_id: str.",
-      "Create src/api/routes/chat.py: implement async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> ChatResponse.",
-      "Inside handler: record start_time = time.monotonic(), call await get_graph(), invoke with await graph.ainvoke({'messages': [HumanMessage(content=request.question)], 'question': request.question, 'session_id': request.session_id, 'tools_called': []}), extract answer from result['messages'][-1].content, compute latency_ms, call save_query(), return ChatResponse.",
-      "Register router in src/main.py: app.include_router(chat_router).",
-      "In src/main.py lifespan: call await load_mcp_tools() and await get_graph() at startup to warm up connections before serving traffic."
+      "src/routes/responses.py: ChatRequest(question: str), ChatResponse(answer: str), HealthResponse(healthy: bool).",
+      "src/routes/chat.py: async def chat(body: ChatRequest) calls agent_call(body.question), returns ChatResponse."
     ],
-    "depends_on": ["F13", "F02"],
-    "passes": true
-  },
-  {
-    "id": "F15",
-    "title": "GET /history Endpoint",
-    "category": "api",
-    "description": "Implement the GET /history route that returns the last 20 queries optionally filtered by session_id.",
-    "steps": [
-      "In src/api/schemas.py: add HistoryItem(BaseModel) with fields: query_id: str, session_id: str | None, question: str, answer: str | None, tools_used: list[dict] | None, latency_ms: int | None, created_at: datetime.",
-      "Create src/api/routes/history.py: implement async def get_history_route(session_id: str | None = Query(default=None), limit: int = Query(default=20, le=100), db: AsyncSession = Depends(get_db)) -> list[HistoryItem].",
-      "Call await get_history(db, session_id=UUID(session_id) if session_id else None, limit=limit), map QueryModel objects to HistoryItem, return list.",
-      "Register router in src/main.py: app.include_router(history_router)."
-    ],
-    "depends_on": ["F02"],
+    "depends_on": ["F11"],
     "passes": true
   },
   {
     "id": "F16",
     "title": "GET /health Endpoint",
     "category": "api",
-    "description": "Implement the GET /health route that checks all four downstream dependencies (PostgreSQL, MCP, Ollama, IBGE) and returns a structured health report.",
+    "description": "GET /health returns {healthy: true}. Used by Docker Compose healthcheck.",
     "steps": [
-      "Create src/api/routes/health.py.",
-      "Define ServiceStatus(BaseModel) with name: str, ok: bool, detail: str | None. Define HealthResponse(BaseModel) with healthy: bool, services: list[ServiceStatus].",
-      "Implement four async check coroutines: check_postgres(db) runs SELECT 1; check_mcp() GET {MCP_BASE_URL}/health expects 200; check_ollama() GET {OLLAMA_BASE_URL}/api/tags expects 200; check_ibge() GET {IBGE_BASE_URL}/v1/localidades/estados expects 200.",
-      "In the handler: run all checks with asyncio.gather(*[check_postgres(db), check_mcp(), check_ollama(), check_ibge()], return_exceptions=True). Map results to ServiceStatus list. Set healthy = all(s.ok for s in services). Return HealthResponse.",
-      "Register router in src/main.py: app.include_router(health_router).",
-      "Write integration test in tests/integration/test_health.py: use FastAPI TestClient, mock all four HTTP checks, test all-healthy case and one-service-down case."
+      "src/routes/health.py: returns HealthResponse(healthy=True)."
     ],
-    "depends_on": ["F02"],
+    "depends_on": ["F04"],
     "passes": true
   },
   {
     "id": "F17",
     "title": "GitHub Actions CI Pipeline",
     "category": "ci",
-    "description": "Create the GitHub Actions CI workflow with three jobs: lint (ruff), unit-tests (pytest tests/unit/), and integration-test (pytest tests/integration/). No Docker services required in CI.",
+    "description": "Single lint job on push/PR to main: installs requirements.txt and runs ruff check.",
     "steps": [
-      "Create .github/workflows/ci.yml.",
-      "Set triggers: on push branches [main] and pull_request branches [main].",
-      "Job lint: runs-on ubuntu-latest, steps: checkout, setup-python 3.13, pip install ruff, run ruff check src/ mcp_server/ tests/.",
-      "Job unit-tests: runs-on ubuntu-latest, needs: [lint], steps: checkout, setup-python 3.13, pip install -e '.[dev]', run pytest tests/unit/ -v.",
-      "Job integration-test: runs-on ubuntu-latest, needs: [lint], steps: checkout, setup-python 3.13, pip install -e '.[dev]', run pytest tests/integration/ -v. Note: integration tests use mocked HTTP clients so no Docker services are needed.",
-      "Ensure pyproject.toml has [tool.pytest.ini_options] with asyncio_mode = 'auto' and testpaths = ['tests']."
+      ".github/workflows/ci.yml: trigger on push+PR to main, job ruff on ubuntu-latest, setup-python 3.11, pip install -r requirements.txt, run ruff check .",
+      "dependabot.yml: weekly updates for pip, actions, and docker."
     ],
-    "depends_on": ["F14", "F15", "F16"],
+    "depends_on": ["F04"],
     "passes": true
+  },
+  {
+    "id": "F18",
+    "title": "MLflow Monitoring",
+    "category": "observability",
+    "description": "Add MLflow tracking to the agent to log inputs, outputs, tool calls, latency, and model metadata for each invocation.",
+    "steps": [
+      "Add mlflow to requirements.txt and pyproject.toml dependencies.",
+      "Add MLFLOW_TRACKING_URI env var to .env.example and docker-compose.yml (default http://mlflow:5000).",
+      "Optionally add an mlflow service to docker-compose.yml.",
+      "In src/agent/agent.py, wrap agent_call with an mlflow run: log question, model name, latency_ms, tools_used, and answer as params/metrics/artifacts.",
+      "Create a dedicated src/observability/mlflow.py helper to encapsulate run creation and logging."
+    ],
+    "depends_on": ["F14"],
+    "passes": false
+  },
+  {
+    "id": "F19",
+    "title": "Error Handling (try/except blocks)",
+    "category": "reliability",
+    "description": "Add structured error handling across routes and agent calls so failures return meaningful HTTP responses instead of 500 Internal Server Error.",
+    "steps": [
+      "In src/routes/chat.py, wrap agent_call in try/except and return HTTP 502 on LLM/MCP connection errors, HTTP 422 on validation errors.",
+      "In src/agent/agent.py, catch httpx.ConnectError and raise a custom AgentUnavailableError with a clear message.",
+      "In src/mcp/client.py, catch connection errors on load_mcp_tools and raise RuntimeError with context.",
+      "Add a global FastAPI exception handler in src/main.py for unhandled exceptions returning {\"detail\": \"internal error\"} with HTTP 500.",
+      "Ensure all error paths are logged with the Python logging module."
+    ],
+    "depends_on": ["F14"],
+    "passes": false
   }
 ]
