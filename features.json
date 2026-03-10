@@ -107,9 +107,7 @@
     "title": "GET /health Endpoint",
     "category": "api",
     "description": "GET /health returns {healthy: true}. Used by Docker Compose healthcheck.",
-    "steps": [
-      "src/routes/health.py: returns HealthResponse(healthy=True)."
-    ],
+    "steps": ["src/routes/health.py: returns HealthResponse(healthy=True)."],
     "depends_on": ["F04"],
     "passes": true
   },
@@ -153,6 +151,21 @@
       "Ensure all error paths are logged with the Python logging module."
     ],
     "depends_on": ["F14"],
+    "passes": false
+  },
+  {
+    "id": "F20",
+    "title": "Application Logger",
+    "category": "observability",
+    "description": "Add src/logger.py with a setup_logger() factory and a CustomLogger wrapper class that standardizes log formatting across the application.",
+    "steps": [
+      "Create src/logger.py with LOG_LEVEL=INFO and LOG_FORMAT from env var LOG_FORMAT (default 'text').",
+      "setup_logger(name): returns a logging.Logger with a StreamHandler to stdout, formatted as '%(asctime)s | %(levelname)s | %(module)s:%(lineno)d | %(message)s'.",
+      "CustomLogger wraps the logger instance and exposes info/warning/error/debug/critical methods using stacklevel=3 so the caller's module:lineno appears in the log.",
+      "Export a module-level logger = CustomLogger(setup_logger(__name__)) singleton for direct import.",
+      "Use logger from src.logger in all modules (agent, routes, mcp client)."
+    ],
+    "depends_on": ["F04"],
     "passes": false
   }
 ]
