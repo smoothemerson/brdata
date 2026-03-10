@@ -6,6 +6,10 @@ x-ollama: &service-ollama
     - 11434:11434
   volumes:
     - ollama_data:/root/.ollama
+  networks:
+    default:
+      aliases:
+        - ollama
 
 x-init-ollama: &init-ollama
   image: ollama/ollama:latest
