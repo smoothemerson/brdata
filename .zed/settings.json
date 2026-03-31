@@ -1,0 +1,10 @@
+{
+  "file_scan_exclusions": [
+    "__pycache__",
+    ".git",
+    ".venv",
+    "mlflow",
+    ".ruff_cache",
+    "uv.lock",
+  ],
+}
