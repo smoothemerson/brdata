@@ -24,6 +24,32 @@ x-init-ollama: &init-ollama
     - "sleep 3; ollama pull ${OLLAMA_MODEL}"
 
 services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      MCP_BASE_URL: ${MCP_BASE_URL:-http://mcp:8001}
+      IBGE_BASE_URL: ${IBGE_BASE_URL:-https://servicodados.ibge.gov.br/api}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+    depends_on:
+      ollama-pull-llama-cpu:
+        condition: service_completed_successfully
+        required: false
+      ollama-pull-llama-gpu-amd:
+        condition: service_completed_successfully
+        required: false
+      ollama-pull-llama-gpu-nvidia:
+        condition: service_completed_successfully
+        required: false
+      mlflow:
+        condition: service_started
+      mcp:
+        condition: service_started
+    restart: on-failure
+
   mcp:
     build:
       context: .
@@ -80,25 +106,21 @@ services:
     depends_on:
       - ollama-gpu-nvidia
 
-  api:
-    build: .
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
     ports:
-      - "8000:8000"
-    environment:
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      MCP_BASE_URL: ${MCP_BASE_URL:-http://mcp:8001}
-      IBGE_BASE_URL: ${IBGE_BASE_URL:-https://servicodados.ibge.gov.br/api}
-    depends_on:
-      ollama-pull-llama-cpu:
-        condition: service_completed_successfully
-        required: false
-      ollama-pull-llama-gpu-amd:
-        condition: service_completed_successfully
-        required: false
-      ollama-pull-llama-gpu-nvidia:
-        condition: service_completed_successfully
-        required: false
+      - "5000:5000"
+    volumes:
+      - ./mlflow/data:/mlflow/data
+      - ./mlflow/artifacts:/mlflow/artifacts
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/data/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --allowed-hosts "*"
+      --cors-allowed-origins "http://0.0.0.0:5000,http://localhost:5000"
     restart: on-failure
 
 volumes:

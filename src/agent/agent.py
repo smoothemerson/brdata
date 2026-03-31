@@ -2,8 +2,8 @@ from langchain.agents import create_agent
 from langchain_ollama import ChatOllama
 
 from src.agent.prompt import SYSTEM_PROMPT
-from src.env import OLLAMA_BASE_URL, OLLAMA_MODEL
 from src.mcp.client import load_mcp_tools
+from src.utils.env import OLLAMA_BASE_URL, OLLAMA_MODEL
 
 
 async def agent_call(question):
