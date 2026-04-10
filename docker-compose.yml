@@ -3,7 +3,7 @@ x-ollama: &service-ollama
   container_name: ollama
   restart: unless-stopped
   ports:
-    - 11434:11434
+    - "127.0.0.1:11434:11434"
   volumes:
     - ollama_data:/root/.ollama
   networks:
@@ -27,13 +27,14 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       MCP_BASE_URL: ${MCP_BASE_URL:-http://mcp:8001}
       IBGE_BASE_URL: ${IBGE_BASE_URL:-https://servicodados.ibge.gov.br/api}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      API_KEY: ${API_KEY}
     depends_on:
       ollama-pull-llama-cpu:
         condition: service_completed_successfully
@@ -55,7 +56,7 @@ services:
       context: .
       dockerfile: mcp_server/Dockerfile
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
       IBGE_BASE_URL: ${IBGE_BASE_URL}
     healthcheck:
@@ -109,7 +110,7 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     volumes:
       - ./mlflow/data:/mlflow/data
       - ./mlflow/artifacts:/mlflow/artifacts

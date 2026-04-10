@@ -1,13 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatResponse(BaseModel):
     answer: str
-    # tools_used: list[dict[str, str]]
 
 
 class ChatRequest(BaseModel):
-    question: str
+    question: str = Field(..., min_length=1, max_length=5000)
 
 
 class HealthResponse(BaseModel):
