@@ -109,20 +109,36 @@ services:
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
       - ./mlflow/data:/mlflow/data
       - ./mlflow/artifacts:/mlflow/artifacts
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri sqlite:////mlflow/data/mlflow.db
-      --default-artifact-root /mlflow/artifacts
-      --allowed-hosts "*"
-      --cors-allowed-origins "http://0.0.0.0:5000,http://localhost:5000"
-    restart: on-failure
+    command:
+      - /bin/bash
+      - -c
+      - |
+        pip install --no-cache-dir psycopg2-binary boto3
+        mlflow server \
+          --backend-store-uri sqlite:////mlflow/data/mlflow.db \
+          --artifacts-destination /mlflow/artifacts \
+          --allowed-hosts "*" \
+          --cors-allowed-origins "http://0.0.0.0:5000,http://localhost:5000" \
+          --serve-artifacts \
+          --host 0.0.0.0 \
+          --port 5000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
 volumes:
   ollama_data:
