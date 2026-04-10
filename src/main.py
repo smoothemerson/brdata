@@ -20,6 +20,9 @@ app = FastAPI(
     description="A data assistant for Brazilian public data",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 app.include_router(chat_router)
