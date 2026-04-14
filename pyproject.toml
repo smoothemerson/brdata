@@ -25,5 +25,5 @@ line-length = 88
 
 [dependency-groups]
 dev = [
-    "ruff==0.15.8",
+    "ruff==0.15.10",
 ]
